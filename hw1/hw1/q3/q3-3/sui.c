@@ -1,0 +1,81 @@
+module mmult(
+    input clk,                   // Clock signal.
+    input reset_n,               // Reset signal (negative logic).
+    input enable,                // Activation signal for matrix multiplication
+                                 //(tells the circuit that A and B are ready for use）
+    input [0 : 9 * 8 - 1] A_mat, // A matrix.
+    input [0 : 9 * 8 - 1] B_mat, // B matrix.
+
+    output valid,                     // Signals that the output is valid to read.
+    output reg [0 : 9 * 18 - 1] C_mat // The result of A x B.
+);
+
+// Temporary registers to hold matrix elements
+reg [7:0] A [0:2] [0:2];  // 3x3 matrix A, each element 8 bits.
+reg [7:0] B [0:2] [0:2];  // 3x3 matrix B, each element 8 bits.
+reg [17:0] C [0:2] [0:2]; // 3x3 matrix C, each element 18 bits.
+
+integer i, j, k; // Loop indices.
+
+always @(posedge clk or negedge reset_n) begin
+    if (~reset_n) begin
+    // Reset the output and valid signal.
+    C_mat
+    <= 0;
+valid <= 0;
+end else if (enable) begin
+    // Load the input matrices A and B from the input bus (flattened format).
+    for (i = 0; i < 3; i = i + 1) begin for (j = 0; j < 3; j = j + 1) begin
+        A[i][j] <= A_mat [(i * 3 + j) * 8 +:8];
+B[i][j] <= B_mat [(i * 3 + j) * 8 +:8];
+end
+        end
+
+    // Perform matrix multiplication.
+    for (i = 0; i < 3; i++) begin for (j = 0; j < 3; j++) begin
+        C[i][j] <= 0; // Initialize the result element to 0.
+for (k = 0; k < 3; k++)
+    begin
+            C[i][j] <= C[i][j] + (A[i][k] * B[k][j]); // Multiply and accumulate.
+end
+        end
+            end
+
+    // Pack the result matrix C back into the output bus.
+    for (i = 0; i < 3; i = i + 1) begin for (j = 0; j < 3; j = j + 1) begin
+    C_mat [(i * 3 + j) * 18 +:18] <= C[i][j];
+end
+        end
+
+            // Set valid signal after computation is done.
+            valid <= 1;
+
+end else begin
+        // If not enabled, keep the output valid signal low.
+        valid <= 0;
+end
+    end
+
+        always @(*) begin // @(*) means all the inputs are included.
+    @(posedge valid);
+
+// Wait one clock cycle so that the output is saved in result[].
+# 10 $display("\nThe result of C = A x B is:\n");
+
+for (idx = 0; idx < 9; idx = idx + 1)           // E.g.
+    begin                                       // for idx = 0
+        $write(" %d ", result [idx * 18 +:18]); // result[0+:18] = result[0:17]
+if (idx % 3 == 2)
+    $write("\n"); // for idx = 1
+end               // result[18+:18] = result[18:35]
+    $write("\n"); // for idx = 2
+end               // result[35+:18] = result[36:53]
+        always @(posedge clk) begin
+    if (~reset_n) result
+    <= 0;                    // Reset the register “result”
+else if (valid) result <= C; // Write the output “C” into the register
+                             // “result”
+else result <= result;       // Keep the value in the register “result”
+end
+
+    endmodule
